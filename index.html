@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buku Rencana</title>
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Buku Rencana">
+<meta name="theme-color" content="#0a0a0a">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a; --surface: #141414; --surface2: #1c1c1c; --surface3: #232323;
+    --border: #2b2b2b; --text: #f2f2f0; --text-muted: #969390; --text-faint: #5a5754; --white: #f2f2f0;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; }
+
+  .shell { display: flex; min-height: 100vh; }
+
+  /* SIDEBAR NAV */
+  .nav {
+    width: 210px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border);
+    padding: 20px 14px; position: fixed; left: 0; top: 0; height: 100vh; z-index: 50;
+    transform: translateX(-100%); transition: transform 0.25s ease; box-shadow: 0 0 30px rgba(0,0,0,0.5);
+  }
+  .nav.open { transform: translateX(0); }
+  .nav-title { padding: 4px 8px 18px; }
+  #app-title {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 19px; letter-spacing: -0.01em;
+    background: none; border: none; color: var(--text); padding: 2px 2px; border-radius: 5px; width: 100%;
+  }
+  #app-title:hover, #app-title:focus { background: var(--surface2); outline: none; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: none;
+    color: var(--text-muted); font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500;
+    padding: 10px 10px; border-radius: 7px; cursor: pointer; text-align: left; margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--surface3); color: var(--text); }
+
+  .nav-close {
+    background: none; border: 1px solid var(--border); color: var(--text-muted);
+    width: 28px; height: 28px; border-radius: 6px; cursor: pointer; margin-bottom: 10px;
+  }
+
+  /* MAIN */
+  .main { flex: 1; min-width: 0; padding: 20px 26px 60px; width: 100%; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .topbar h1 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 22px; margin: 0; }
+  #menu-toggle {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    width: 36px; height: 36px; border-radius: 8px; cursor: pointer; font-size: 15px;
+  }
+
+  .date-nav { display: flex; align-items: center; gap: 4px; }
+  .date-nav button.arrow {
+    background: none; border: 1px solid var(--border); color: var(--text-muted);
+    width: 30px; height: 30px; border-radius: 6px; cursor: pointer; font-size: 14px;
+  }
+  .date-nav button.arrow:hover { color: var(--text); border-color: var(--text-faint); }
+  #date-label {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 8px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+  }
+  #date-label:hover { border-color: var(--text-faint); }
+  #date-picker { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
+  #today-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-muted);
+    font-size: 11px; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-family: 'Inter', sans-serif;
+  }
+  #today-btn:hover { color: var(--text); border-color: var(--text-faint); }
+
+  .view { display: none; }
+  .view.active { display: block; animation: fade 0.2s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+  .grid { display: flex; flex-direction: column; gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .card-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+  .card-head h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 16px; margin: 0; }
+  .card-head .hint { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-faint); }
+
+  .empty { color: var(--text-faint); font-size: 13px; text-align: center; padding: 20px 10px; font-style: italic; }
+
+  .form-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  label.flabel { font-size: 11px; color: var(--text-faint); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 5px; }
+  input, select {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 7px; padding: 10px 12px; font-family: 'Inter', sans-serif; font-size: 14px; outline: none;
+  }
+  input:focus, select:focus { border-color: var(--text-faint); }
+  input[type="text"] { flex: 1; min-width: 140px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+
+  button.primary {
+    background: var(--white); color: var(--bg); border: none; border-radius: 7px; padding: 10px 16px;
+    font-family: 'Inter', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  button.primary:hover { opacity: 0.85; }
+
+  /* Checklist */
+  .freq-group { margin-bottom: 14px; }
+  .freq-group:last-child { margin-bottom: 0; }
+  .freq-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-faint); margin-bottom: 6px; display: flex; align-items: center; gap: 8px;
+  }
+  .freq-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .item-row { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--border); }
+  .item-row:last-child { border-bottom: none; }
+  .checkbox {
+    width: 19px; height: 19px; border-radius: 5px; border: 1.5px solid var(--text-faint);
+    cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s ease;
+  }
+  .checkbox.checked { background: var(--white); border-color: var(--white); }
+  .checkbox.checked::after { content: '✓'; color: var(--bg); font-size: 12px; font-weight: 700; }
+  .item-text { flex: 1; font-size: 14px; }
+  .item-text.checked { color: var(--text-faint); text-decoration: line-through; }
+  .del-btn { background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 15px; padding: 2px 6px; }
+  .del-btn:hover { color: var(--text); }
+
+  /* Keuangan */
+  .balance-value { font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: 700; }
+  .balance-sub { display: flex; gap: 14px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  .tx-row { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--border); }
+  .tx-row:last-child { border-bottom: none; }
+  .tx-cat { flex: 1; min-width: 0; }
+  .tx-cat .name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tx-cat .meta { font-size: 10px; color: var(--text-faint); font-family: 'JetBrains Mono', monospace; }
+  .tx-amount { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px; white-space: nowrap; }
+
+  /* Target */
+  .goal-card { padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .goal-card:last-child { border-bottom: none; }
+  .goal-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; gap: 8px; }
+  .goal-title { font-size: 14px; font-weight: 600; }
+  .goal-bar-track { height: 6px; background: var(--surface3); border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
+  .goal-bar-fill { height: 100%; background: var(--white); border-radius: 3px; transition: width 0.3s ease; }
+  .goal-nums { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); }
+  .goal-quick { display: flex; gap: 6px; margin-top: 8px; }
+  .goal-quick button { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 5px; width: 26px; height: 26px; cursor: pointer; font-size: 13px; }
+  .goal-quick button:hover { border-color: var(--text-faint); }
+
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); opacity: 0; pointer-events: none; transition: opacity 0.25s ease; z-index: 40; }
+  .overlay.show { opacity: 1; pointer-events: auto; }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--surface3); border: 1px solid var(--text-faint); color: var(--text);
+    padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none;
+    transition: all 0.25s ease; z-index: 60;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 720px) {
+    .main { padding: 16px 14px 50px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <div class="overlay" id="nav-overlay"></div>
+  <nav class="nav" id="nav">
+    <button class="nav-close" id="nav-close">✕</button>
+    <div class="nav-title"><input id="app-title" value="Buku Rencana" spellcheck="false"></div>
+    <button class="nav-item active" data-view="dashboard">Dashboard</button>
+    <button class="nav-item" data-view="checklist">Checklist</button>
+    <button class="nav-item" data-view="keuangan">Keuangan</button>
+    <button class="nav-item" data-view="target">Target</button>
+  </nav>
+
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button id="menu-toggle">☰</button>
+        <h1 id="view-title">Dashboard</h1>
+      </div>
+      <div class="date-nav">
+        <button class="arrow" id="prev-day">‹</button>
+        <button id="date-label"></button>
+        <button class="arrow" id="next-day">›</button>
+        <button id="today-btn">Hari ini</button>
+        <input type="date" id="date-picker">
+      </div>
+    </div>
+
+    <!-- DASHBOARD VIEW -->
+    <div class="view active" id="view-dashboard">
+      <div class="grid">
+        <div class="card">
+          <div class="card-head"><h2>Checklist</h2><span class="hint" id="checklist-hint-d"></span></div>
+          <div id="checklist-content-d"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Keuangan</h2></div>
+          <div class="balance-value" id="balance-total-d">Rp 0</div>
+          <div class="balance-sub"><span id="balance-in-d">+ Rp 0</span><span id="balance-out-d">− Rp 0</span></div>
+          <div id="tx-list-d" style="margin-top:12px;"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Target</h2></div>
+          <div id="goal-list-d"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHECKLIST VIEW -->
+    <div class="view" id="view-checklist">
+      <div class="card">
+        <div class="form-row">
+          <div class="field" style="flex:1;min-width:140px;"><label class="flabel">Tugas</label><input type="text" id="cl-input" placeholder="Tulis kebutuhan atau tugas..."></div>
+          <div class="field"><label class="flabel">Frekuensi</label>
+            <select id="cl-freq"><option value="harian">Harian</option><option value="mingguan">Mingguan</option><option value="bulanan">Bulanan</option></select>
+          </div>
+          <div class="field"><label class="flabel">&nbsp;</label><button class="primary" onclick="addChecklist()">Tambah</button></div>
+        </div>
+      </div>
+      <div class="card"><div class="card-head"><h2>Untuk tanggal ini</h2></div><div id="checklist-content"></div></div>
+    </div>
+
+    <!-- KEUANGAN VIEW -->
+    <div class="view" id="view-keuangan">
+      <div class="card">
+        <div class="balance-value" id="balance-total">Rp 0</div>
+        <div class="balance-sub"><span id="balance-in">+ Rp 0</span><span id="balance-out">− Rp 0</span></div>
+      </div>
+      <div class="card">
+        <div class="form-row">
+          <div class="field"><label class="flabel">Jenis</label><select id="tx-type"><option value="in">Pemasukan (+)</option><option value="out">Pengeluaran (−)</option></select></div>
+          <div class="field" style="flex:1;min-width:120px;"><label class="flabel">Kategori</label><input type="text" id="tx-category" placeholder="mis. Gaji, Makan"></div>
+          <div class="field"><label class="flabel">Jumlah (Rp)</label><input type="number" id="tx-amount" placeholder="0" style="width:120px;"></div>
+        </div>
+        <div class="form-row">
+          <input type="text" id="tx-note" placeholder="Catatan (opsional)">
+          <button class="primary" onclick="addTransaction()">Catat Transaksi</button>
+        </div>
+      </div>
+      <div class="card" id="tx-list"></div>
+    </div>
+
+    <!-- TARGET VIEW -->
+    <div class="view" id="view-target">
+      <div class="card">
+        <div class="form-row">
+          <div class="field" style="flex:1;min-width:140px;"><label class="flabel">Nama target</label><input type="text" id="goal-title" placeholder="mis. Tabungan Laptop"></div>
+          <div class="field"><label class="flabel">Target angka</label><input type="number" id="goal-target" placeholder="0" style="width:110px;"></div>
+          <div class="field"><label class="flabel">Satuan</label><input type="text" id="goal-unit" placeholder="Rp/kg/dll" style="width:100px;"></div>
+        </div>
+        <div class="form-row">
+          <input type="date" id="goal-deadline">
+          <button class="primary" onclick="addGoal()">Buat Target</button>
+        </div>
+      </div>
+      <div id="goal-list"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let state = { title: 'Buku Rencana', checklist: [], transactions: [], goals: [] };
+let selectedDate = new Date();
+let saveTimer = null;
+let currentView = 'dashboard';
+
+function dateKey(d) {
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function isSameDay(a, b) { return dateKey(a) === dateKey(b); }
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem('buku-rencana-data');
+    if (raw) {
+      const loaded = JSON.parse(raw);
+      state.title = loaded.title || 'Buku Rencana';
+      state.checklist = (loaded.checklist || []).map(i => ({
+        id: i.id, text: i.text, freq: i.freq || 'harian', date: i.date || dateKey(new Date()), done: !!i.done
+      }));
+      state.transactions = loaded.transactions || [];
+      state.goals = loaded.goals || [];
+    }
+  } catch (e) { console.log('Belum ada data tersimpan, mulai baru.'); }
+  document.getElementById('app-title').value = state.title;
+  renderAll();
+}
+
+function queueSave() { clearTimeout(saveTimer); saveTimer = setTimeout(saveState, 300); }
+function saveState() {
+  try {
+    localStorage.setItem('buku-rencana-data', JSON.stringify(state));
+  } catch (e) { console.error('Storage error:', e); showToast('Gagal menyimpan, coba lagi.'); }
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+function escapeHtml(str) { const div = document.createElement('div'); div.textContent = str; return div.innerHTML; }
+
+// TITLE
+const titleInput = document.getElementById('app-title');
+titleInput.addEventListener('change', () => {
+  state.title = titleInput.value.trim() || 'Buku Rencana';
+  titleInput.value = state.title;
+  queueSave();
+});
+titleInput.addEventListener('keydown', e => { if (e.key === 'Enter') titleInput.blur(); });
+
+// NAV SWITCHING
+const viewTitles = { dashboard: 'Dashboard', checklist: 'Checklist', keuangan: 'Keuangan', target: 'Target' };
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    currentView = item.dataset.view;
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('view-' + currentView).classList.add('active');
+    document.getElementById('view-title').textContent = viewTitles[currentView];
+    closeMobileNav();
+  });
+});
+
+function closeMobileNav() { document.getElementById('nav').classList.remove('open'); document.getElementById('nav-overlay').classList.remove('show'); }
+document.getElementById('menu-toggle').addEventListener('click', () => { document.getElementById('nav').classList.add('open'); document.getElementById('nav-overlay').classList.add('show'); });
+document.getElementById('nav-close').addEventListener('click', closeMobileNav);
+document.getElementById('nav-overlay').addEventListener('click', closeMobileNav);
+
+// DATE NAV
+function renderDateLabel() {
+  const isToday = isSameDay(selectedDate, new Date());
+  const label = selectedDate.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  document.getElementById('date-label').textContent = (isToday ? 'HARI INI · ' : '') + label.toUpperCase();
+  document.getElementById('date-picker').value = dateKey(selectedDate);
+  const hintText = isToday ? '' : (selectedDate < new Date().setHours(0,0,0,0) ? 'lampau' : 'rencana');
+  document.getElementById('checklist-hint-d').textContent = hintText;
+}
+document.getElementById('prev-day').addEventListener('click', () => { selectedDate.setDate(selectedDate.getDate()-1); selectedDate = new Date(selectedDate); renderDateLabel(); renderChecklist(); });
+document.getElementById('next-day').addEventListener('click', () => { selectedDate.setDate(selectedDate.getDate()+1); selectedDate = new Date(selectedDate); renderDateLabel(); renderChecklist(); });
+document.getElementById('today-btn').addEventListener('click', () => { selectedDate = new Date(); renderDateLabel(); renderChecklist(); });
+document.getElementById('date-label').addEventListener('click', () => document.getElementById('date-picker').showPicker ? document.getElementById('date-picker').showPicker() : document.getElementById('date-picker').click());
+document.getElementById('date-picker').addEventListener('change', (e) => {
+  if (!e.target.value) return;
+  const [y,m,d] = e.target.value.split('-').map(Number);
+  selectedDate = new Date(y, m-1, d);
+  renderDateLabel(); renderChecklist();
+});
+
+// ===== CHECKLIST =====
+function addChecklist() {
+  const input = document.getElementById('cl-input');
+  const freq = document.getElementById('cl-freq').value;
+  const text = input.value.trim();
+  if (!text) return;
+  state.checklist.push({ id: Date.now().toString(), text, freq, date: dateKey(selectedDate), done: false });
+  input.value = '';
+  queueSave(); renderChecklist();
+  showToast('Ditambahkan ke ' + selectedDate.toLocaleDateString('id-ID', {day:'numeric', month:'short'}));
+}
+function toggleChecklist(id) {
+  const item = state.checklist.find(i => i.id === id);
+  if (!item) return;
+  item.done = !item.done;
+  queueSave(); renderChecklist();
+}
+function deleteChecklist(id) {
+  state.checklist = state.checklist.filter(i => i.id !== id);
+  queueSave(); renderChecklist();
+}
+function buildChecklistHtml(items) {
+  if (items.length === 0) return '<div class="empty">Belum ada tugas untuk tanggal ini.</div>';
+  const groups = { harian: [], mingguan: [], bulanan: [] };
+  items.forEach(i => groups[i.freq]?.push(i));
+  const labels = { harian: 'Harian', mingguan: 'Mingguan', bulanan: 'Bulanan' };
+  let html = '';
+  ['harian','mingguan','bulanan'].forEach(freq => {
+    if (groups[freq].length === 0) return;
+    html += `<div class="freq-group"><div class="freq-label">${labels[freq]}</div>`;
+    groups[freq].forEach(item => {
+      html += `<div class="item-row">
+        <div class="checkbox ${item.done ? 'checked' : ''}" onclick="toggleChecklist('${item.id}')"></div>
+        <div class="item-text ${item.done ? 'checked' : ''}">${escapeHtml(item.text)}</div>
+        <button class="del-btn" onclick="deleteChecklist('${item.id}')">✕</button>
+      </div>`;
+    });
+    html += '</div>';
+  });
+  return html;
+}
+function renderChecklist() {
+  const key = dateKey(selectedDate);
+  const items = state.checklist.filter(i => i.date === key);
+  const html = buildChecklistHtml(items);
+  document.getElementById('checklist-content').innerHTML = html;
+  document.getElementById('checklist-content-d').innerHTML = html;
+}
+
+// ===== KEUANGAN =====
+function formatRupiah(n) { return 'Rp ' + Math.abs(n).toLocaleString('id-ID'); }
+function addTransaction() {
+  const type = document.getElementById('tx-type').value;
+  const category = document.getElementById('tx-category').value.trim();
+  const amount = parseFloat(document.getElementById('tx-amount').value);
+  const note = document.getElementById('tx-note').value.trim();
+  if (!category || !amount || amount <= 0) return;
+  state.transactions.unshift({ id: Date.now().toString(), type, category, amount, note, date: new Date().toLocaleDateString('id-ID', {day:'numeric', month:'short'}) });
+  document.getElementById('tx-category').value = '';
+  document.getElementById('tx-amount').value = '';
+  document.getElementById('tx-note').value = '';
+  queueSave(); renderKeuangan();
+  showToast('Transaksi dicatat');
+}
+function deleteTransaction(id) { state.transactions = state.transactions.filter(t => t.id !== id); queueSave(); renderKeuangan(); }
+function renderKeuangan() {
+  const totalIn = state.transactions.filter(t => t.type === 'in').reduce((s,t) => s+t.amount, 0);
+  const totalOut = state.transactions.filter(t => t.type === 'out').reduce((s,t) => s+t.amount, 0);
+  const bal = formatRupiah(totalIn - totalOut), inTxt = '+ ' + formatRupiah(totalIn), outTxt = '− ' + formatRupiah(totalOut);
+  document.getElementById('balance-total').textContent = bal;
+  document.getElementById('balance-in').textContent = inTxt;
+  document.getElementById('balance-out').textContent = outTxt;
+  document.getElementById('balance-total-d').textContent = bal;
+  document.getElementById('balance-in-d').textContent = inTxt;
+  document.getElementById('balance-out-d').textContent = outTxt;
+
+  const rowHtml = t => `<div class="tx-row">
+      <div class="tx-cat"><div class="name">${escapeHtml(t.category)}${t.note ? ' — ' + escapeHtml(t.note) : ''}</div><div class="meta">${t.date}</div></div>
+      <div class="tx-amount">${t.type === 'in' ? '+' : '−'}${formatRupiah(t.amount)}</div>
+      <button class="del-btn" onclick="deleteTransaction('${t.id}')">✕</button>
+    </div>`;
+  document.getElementById('tx-list').innerHTML = state.transactions.length === 0 ? '<div class="empty">Belum ada transaksi tercatat.</div>' : state.transactions.map(rowHtml).join('');
+  document.getElementById('tx-list-d').innerHTML = state.transactions.length === 0 ? '<div class="empty">Belum ada transaksi tercatat.</div>' : state.transactions.slice(0,5).map(rowHtml).join('');
+}
+
+// ===== TARGET =====
+function addGoal() {
+  const title = document.getElementById('goal-title').value.trim();
+  const target = parseFloat(document.getElementById('goal-target').value);
+  const unit = document.getElementById('goal-unit').value.trim() || 'unit';
+  const deadline = document.getElementById('goal-deadline').value;
+  if (!title || !target || target <= 0) return;
+  state.goals.push({ id: Date.now().toString(), title, target, unit, deadline, current: 0 });
+  document.getElementById('goal-title').value = '';
+  document.getElementById('goal-target').value = '';
+  document.getElementById('goal-unit').value = '';
+  document.getElementById('goal-deadline').value = '';
+  queueSave(); renderGoals();
+  showToast('Target dibuat');
+}
+function updateGoalProgress(id, delta) {
+  const goal = state.goals.find(g => g.id === id);
+  if (!goal) return;
+  goal.current = Math.max(0, Math.min(goal.target, goal.current + delta));
+  queueSave(); renderGoals();
+}
+function deleteGoal(id) { state.goals = state.goals.filter(g => g.id !== id); queueSave(); renderGoals(); }
+function goalCardHtml(g, withDelete) {
+  const pct = Math.min(100, Math.round((g.current / g.target) * 100));
+  return `<div class="goal-card">
+      <div class="goal-top"><span class="goal-title">${escapeHtml(g.title)}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);">${pct}%</span></div>
+      <div class="goal-bar-track"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
+      <div class="goal-nums"><span>${g.current.toLocaleString('id-ID')} / ${g.target.toLocaleString('id-ID')} ${escapeHtml(g.unit)}</span></div>
+      <div class="goal-quick">
+        <button onclick="updateGoalProgress('${g.id}', -1)">−</button>
+        <button onclick="updateGoalProgress('${g.id}', 1)">+</button>
+        ${withDelete ? `<button class="del-btn" onclick="deleteGoal('${g.id}')" style="margin-left:auto;">✕</button>` : ''}
+      </div>
+    </div>`;
+}
+function renderGoals() {
+  const html = state.goals.length === 0 ? '<div class="card"><div class="empty">Belum ada target.</div></div>' : state.goals.map(g => goalCardHtml(g, true)).join('');
+  document.getElementById('goal-list').innerHTML = html;
+  const dHtml = state.goals.length === 0 ? '<div class="empty">Belum ada target.</div>' : state.goals.map(g => goalCardHtml(g, false)).join('');
+  document.getElementById('goal-list-d').innerHTML = dHtml;
+}
+
+function renderAll() { renderDateLabel(); renderChecklist(); renderKeuangan(); renderGoals(); }
+loadState();
+</script>
+
+</body>
+</html>
