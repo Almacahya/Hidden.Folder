@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hidden Folder</title>
+<title>Buku Rencana</title>
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -142,8 +142,9 @@
   .goal-bar-track { height: 6px; background: var(--surface3); border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
   .goal-bar-fill { height: 100%; background: var(--white); border-radius: 3px; transition: width 0.3s ease; }
   .goal-nums { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); }
-  .goal-quick { display: flex; gap: 6px; margin-top: 8px; }
-  .goal-quick button { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 5px; width: 26px; height: 26px; cursor: pointer; font-size: 13px; }
+  .goal-quick { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
+  .goal-quick input { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 5px; }
+  .goal-quick button { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 5px; height: 30px; cursor: pointer; font-size: 13px; }
   .goal-quick button:hover { border-color: var(--text-faint); }
 
   .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); opacity: 0; pointer-events: none; transition: opacity 0.25s ease; z-index: 40; }
@@ -468,11 +469,21 @@ function goalCardHtml(g, withDelete) {
       <div class="goal-bar-track"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
       <div class="goal-nums"><span>${g.current.toLocaleString('id-ID')} / ${g.target.toLocaleString('id-ID')} ${escapeHtml(g.unit)}</span></div>
       <div class="goal-quick">
-        <button onclick="updateGoalProgress('${g.id}', -1)">−</button>
-        <button onclick="updateGoalProgress('${g.id}', 1)">+</button>
+        <input type="number" placeholder="Jumlah" data-goal-id="${g.id}" style="width:100px;padding:6px 8px;font-size:13px;height:auto;" onkeydown="if(event.key==='Enter'){addGoalAmount('${g.id}', this); event.preventDefault();}">
+        <button onclick="addGoalAmount('${g.id}', this.previousElementSibling)" style="width:auto;padding:0 10px;font-size:12px;">Tambah</button>
         ${withDelete ? `<button class="del-btn" onclick="deleteGoal('${g.id}')" style="margin-left:auto;">✕</button>` : ''}
       </div>
     </div>`;
+}
+function addGoalAmount(id, inputEl) {
+  const goal = state.goals.find(g => g.id === id);
+  if (!goal) return;
+  const val = parseFloat(inputEl.value);
+  if (isNaN(val) || val === 0) return;
+  goal.current = Math.max(0, Math.min(goal.target, goal.current + val));
+  inputEl.value = '';
+  queueSave(); renderGoals();
+  showToast('Progress diperbarui');
 }
 function renderGoals() {
   const html = state.goals.length === 0 ? '<div class="card"><div class="empty">Belum ada target.</div></div>' : state.goals.map(g => goalCardHtml(g, true)).join('');
