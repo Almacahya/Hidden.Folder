@@ -157,6 +157,8 @@
     transition: all 0.25s ease; z-index: 60;
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  summary::-webkit-details-marker { display: none; }
+  summary::marker { content: ''; }
 
   @media (max-width: 720px) {
     .main { padding: 16px 14px 50px; }
@@ -173,6 +175,7 @@
     <button class="nav-item active" data-view="dashboard">Dashboard</button>
     <button class="nav-item" data-view="checklist">Checklist</button>
     <button class="nav-item" data-view="keuangan">Keuangan</button>
+    <button class="nav-item" data-view="recap">Recap</button>
     <button class="nav-item" data-view="target">Target</button>
   </nav>
 
@@ -243,6 +246,12 @@
         </div>
       </div>
       <div class="card" id="tx-list"></div>
+    </div>
+
+    <!-- RECAP VIEW -->
+    <div class="view" id="view-recap">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-faint);margin-bottom:14px;">Riwayat keuangan disusun otomatis per bulan. Keuangan bulan berjalan tetap dicatat di halaman Keuangan.</div>
+      <div id="recap-content"></div>
     </div>
 
     <!-- TARGET VIEW -->
@@ -317,7 +326,7 @@ titleInput.addEventListener('change', () => {
 titleInput.addEventListener('keydown', e => { if (e.key === 'Enter') titleInput.blur(); });
 
 // NAV SWITCHING
-const viewTitles = { dashboard: 'Dashboard', checklist: 'Checklist', keuangan: 'Keuangan', target: 'Target' };
+const viewTitles = { dashboard: 'Dashboard', checklist: 'Checklist', keuangan: 'Keuangan', recap: 'Recap', target: 'Target' };
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', () => {
     currentView = item.dataset.view;
@@ -406,23 +415,35 @@ function renderChecklist() {
 
 // ===== KEUANGAN =====
 function formatRupiah(n) { return 'Rp ' + Math.abs(n).toLocaleString('id-ID'); }
+function monthKeyOf(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+function monthLabel(key) {
+  const [y,m] = key.split('-').map(Number);
+  return new Date(y, m-1, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+}
 function addTransaction() {
   const type = document.getElementById('tx-type').value;
   const category = document.getElementById('tx-category').value.trim();
   const amount = parseFloat(document.getElementById('tx-amount').value);
   const note = document.getElementById('tx-note').value.trim();
   if (!category || !amount || amount <= 0) return;
-  state.transactions.unshift({ id: Date.now().toString(), type, category, amount, note, date: new Date().toLocaleDateString('id-ID', {day:'numeric', month:'short'}) });
+  const now = new Date();
+  state.transactions.unshift({
+    id: Date.now().toString(), type, category, amount, note,
+    date: now.toLocaleDateString('id-ID', {day:'numeric', month:'short'}),
+    monthKey: monthKeyOf(now)
+  });
   document.getElementById('tx-category').value = '';
   document.getElementById('tx-amount').value = '';
   document.getElementById('tx-note').value = '';
-  queueSave(); renderKeuangan();
+  queueSave(); renderKeuangan(); renderRecap();
   showToast('Transaksi dicatat');
 }
-function deleteTransaction(id) { state.transactions = state.transactions.filter(t => t.id !== id); queueSave(); renderKeuangan(); }
+function deleteTransaction(id) { state.transactions = state.transactions.filter(t => t.id !== id); queueSave(); renderKeuangan(); renderRecap(); }
 function renderKeuangan() {
-  const totalIn = state.transactions.filter(t => t.type === 'in').reduce((s,t) => s+t.amount, 0);
-  const totalOut = state.transactions.filter(t => t.type === 'out').reduce((s,t) => s+t.amount, 0);
+  const thisMonth = monthKeyOf(new Date());
+  const monthTx = state.transactions.filter(t => (t.monthKey || monthKeyOf(new Date())) === thisMonth);
+  const totalIn = monthTx.filter(t => t.type === 'in').reduce((s,t) => s+t.amount, 0);
+  const totalOut = monthTx.filter(t => t.type === 'out').reduce((s,t) => s+t.amount, 0);
   const bal = formatRupiah(totalIn - totalOut), inTxt = '+ ' + formatRupiah(totalIn), outTxt = '− ' + formatRupiah(totalOut);
   document.getElementById('balance-total').textContent = bal;
   document.getElementById('balance-in').textContent = inTxt;
@@ -436,8 +457,41 @@ function renderKeuangan() {
       <div class="tx-amount">${t.type === 'in' ? '+' : '−'}${formatRupiah(t.amount)}</div>
       <button class="del-btn" onclick="deleteTransaction('${t.id}')">✕</button>
     </div>`;
-  document.getElementById('tx-list').innerHTML = state.transactions.length === 0 ? '<div class="empty">Belum ada transaksi tercatat.</div>' : state.transactions.map(rowHtml).join('');
-  document.getElementById('tx-list-d').innerHTML = state.transactions.length === 0 ? '<div class="empty">Belum ada transaksi tercatat.</div>' : state.transactions.slice(0,5).map(rowHtml).join('');
+  document.getElementById('tx-list').innerHTML = monthTx.length === 0 ? '<div class="empty">Belum ada transaksi bulan ini.</div>' : monthTx.map(rowHtml).join('');
+  document.getElementById('tx-list-d').innerHTML = monthTx.length === 0 ? '<div class="empty">Belum ada transaksi bulan ini.</div>' : monthTx.slice(0,5).map(rowHtml).join('');
+}
+function renderRecap() {
+  const container = document.getElementById('recap-content');
+  if (!container) return;
+  if (state.transactions.length === 0) { container.innerHTML = '<div class="card"><div class="empty">Belum ada riwayat transaksi.</div></div>'; return; }
+  const byMonth = {};
+  state.transactions.forEach(t => {
+    const key = t.monthKey || monthKeyOf(new Date());
+    if (!byMonth[key]) byMonth[key] = { in: 0, out: 0, items: [] };
+    if (t.type === 'in') byMonth[key].in += t.amount; else byMonth[key].out += t.amount;
+    byMonth[key].items.push(t);
+  });
+  const keys = Object.keys(byMonth).sort().reverse();
+  container.innerHTML = keys.map(key => {
+    const m = byMonth[key];
+    const net = m.in - m.out;
+    const itemsHtml = m.items.map(t => `<div class="tx-row">
+        <div class="tx-cat"><div class="name">${escapeHtml(t.category)}${t.note ? ' — ' + escapeHtml(t.note) : ''}</div><div class="meta">${t.date}</div></div>
+        <div class="tx-amount">${t.type === 'in' ? '+' : '−'}${formatRupiah(t.amount)}</div>
+      </div>`).join('');
+    return `<div class="card">
+      <details>
+        <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;list-style:none;">
+          <span style="font-family:'Fraunces',serif;font-weight:600;font-size:16px;text-transform:capitalize;">${monthLabel(key)}</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:14px;">${formatRupiah(net)}</span>
+        </summary>
+        <div class="balance-sub" style="margin-top:10px;">
+          <span>+ ${formatRupiah(m.in)}</span><span>− ${formatRupiah(m.out)}</span>
+        </div>
+        <div style="margin-top:10px;">${itemsHtml}</div>
+      </details>
+    </div>`;
+  }).join('');
 }
 
 // ===== TARGET =====
@@ -469,18 +523,19 @@ function goalCardHtml(g, withDelete) {
       <div class="goal-bar-track"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
       <div class="goal-nums"><span>${g.current.toLocaleString('id-ID')} / ${g.target.toLocaleString('id-ID')} ${escapeHtml(g.unit)}</span></div>
       <div class="goal-quick">
-        <input type="number" placeholder="Jumlah" data-goal-id="${g.id}" style="width:100px;padding:6px 8px;font-size:13px;height:auto;" onkeydown="if(event.key==='Enter'){addGoalAmount('${g.id}', this); event.preventDefault();}">
-        <button onclick="addGoalAmount('${g.id}', this.previousElementSibling)" style="width:auto;padding:0 10px;font-size:12px;">Tambah</button>
+        <input type="number" placeholder="Jumlah" data-goal-id="${g.id}" style="width:100px;padding:6px 8px;font-size:13px;height:auto;" onkeydown="if(event.key==='Enter'){addGoalAmount('${g.id}', this, 1); event.preventDefault();}">
+        <button onclick="addGoalAmount('${g.id}', this.previousElementSibling, 1)" style="width:auto;padding:0 10px;font-size:12px;">Tambah</button>
+        <button onclick="addGoalAmount('${g.id}', this.previousElementSibling.previousElementSibling, -1)" style="width:auto;padding:0 10px;font-size:12px;">Kurangi</button>
         ${withDelete ? `<button class="del-btn" onclick="deleteGoal('${g.id}')" style="margin-left:auto;">✕</button>` : ''}
       </div>
     </div>`;
 }
-function addGoalAmount(id, inputEl) {
+function addGoalAmount(id, inputEl, sign) {
   const goal = state.goals.find(g => g.id === id);
   if (!goal) return;
   const val = parseFloat(inputEl.value);
   if (isNaN(val) || val === 0) return;
-  goal.current = Math.max(0, Math.min(goal.target, goal.current + val));
+  goal.current = Math.max(0, Math.min(goal.target, goal.current + (sign * val)));
   inputEl.value = '';
   queueSave(); renderGoals();
   showToast('Progress diperbarui');
@@ -492,7 +547,7 @@ function renderGoals() {
   document.getElementById('goal-list-d').innerHTML = dHtml;
 }
 
-function renderAll() { renderDateLabel(); renderChecklist(); renderKeuangan(); renderGoals(); }
+function renderAll() { renderDateLabel(); renderChecklist(); renderKeuangan(); renderRecap(); renderGoals(); }
 loadState();
 </script>
 
